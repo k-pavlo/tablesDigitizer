@@ -26,3 +26,7 @@ Thumbs.db
 
 # Testing
 .pytest_cache/
+
+# Input and output
+input/
+output/

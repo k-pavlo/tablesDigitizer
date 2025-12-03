@@ -1,5 +1,7 @@
 python-dotenv>=1.0.0
-anthropic 
+anthropic
 click
-pandas
-numpy
+pdf2image>=1.16.0
+Pillow>=10.0.0
+pandas>=2.0.0
+PyPDF2>=3.0.0
