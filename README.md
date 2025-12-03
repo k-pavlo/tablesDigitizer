@@ -77,6 +77,8 @@ brew install poppler
 
 ## 📖 Usage
 
+> **Note:** All outputs are automatically saved to the `output/` directory
+
 ### Basic Usage - Extract from Image
 
 ```bash
@@ -84,6 +86,8 @@ python tables_digitizer.py extract \
     --image input/sample.png \
     --output results.csv
 ```
+
+**Output:** `output/results.csv` (directory created automatically)
 
 ### Extract from PDF
 
@@ -151,7 +155,7 @@ python tables_digitizer.py extract \
 - Returns best result
 
 ### 4. **Output**
-- Saves clean CSV file
+- Saves clean CSV file to `output/` directory
 - Ready for Excel, pandas, or other tools
 
 ---
@@ -181,7 +185,7 @@ Processing: page_3.png
   ✓ Found total column: 'Total'
   ✓ All rows validated successfully (within 3.0% threshold)
 
-✅ Success! Data saved to: results.csv
+✅ Success! Data saved to: output/results.csv
 
 💡 Tip: Review the output file to verify accuracy
 ```
@@ -210,6 +214,7 @@ Processing: page_3.png
 - Commas in table data are automatically replaced
 - Empty cells are preserved as blank in CSV
 - Column headers are included in output
+- All files saved to `output/` directory
 
 ---
 
@@ -238,3 +243,11 @@ Processing: page_3.png
 ---
 
 **Happy Digitizing! 📊✨**
+
+## :crystal_ball: Future Enhancements
+
+- [ ] **Few-Shot Learning** - Teach Claude digit patterns with example images
+- [ ] **Batch Processing** - Process multiple files at once
+- [ ] **Row Validation** - Validate row sums in addition to columns
+- [ ] **Excel Output** - Direct export to .xlsx format
+- [ ] **OCR Confidence Scores** - Show confidence for each extracted value

@@ -42,7 +42,7 @@ class TableDigitizer:
             click.echo("❌ Error: ANTHROPIC_API_KEY not found!")
             click.echo("\n📝 To fix this:")
             click.echo("1. Copy .env.example to .env")
-            click.echo("2. Add your API key from https://console.anthropic.com/")
+            click.echo("2. Add your API key from https://platform.claude.com/")
             sys.exit(1)
         
         self.client = Anthropic(api_key=self.api_key)
@@ -50,7 +50,8 @@ class TableDigitizer:
     
     def encode_image(self, image_path: str) -> Tuple[str, str]:
         """
-        Encode an image file to base64 for Claude API
+        Encode an image file to base64 for Claude API with automatic compression
+        to stay under 5MB limit
         
         Args:
             image_path: Path to the image file
@@ -58,21 +59,57 @@ class TableDigitizer:
         Returns:
             Tuple of (base64_data, media_type)
         """
-        with open(image_path, 'rb') as f:
-            image_data = f.read()
+        MAX_SIZE_BYTES = 5 * 1024 * 1024  # 5MB limit
         
-        # Determine media type from file extension
-        ext = Path(image_path).suffix.lower()
-        media_type_map = {
-            '.png': 'image/png',
-            '.jpg': 'image/jpeg',
-            '.jpeg': 'image/jpeg',
-            '.gif': 'image/gif',
-            '.webp': 'image/webp'
-        }
-        media_type = media_type_map.get(ext, 'image/png')
+        # Load the image
+        img = Image.open(image_path)
         
-        return base64.b64encode(image_data).decode('utf-8'), media_type
+        # Convert RGBA to RGB if necessary (for JPEG compatibility)
+        if img.mode == 'RGBA':
+            # Create a white background
+            background = Image.new('RGB', img.size, (255, 255, 255))
+            background.paste(img, mask=img.split()[3])  # Use alpha channel as mask
+            img = background
+        elif img.mode not in ('RGB', 'L'):
+            img = img.convert('RGB')
+        
+        # Try different compression strategies
+        quality = 95
+        scale_factor = 1.0
+        
+        while True:
+            # Resize if needed
+            if scale_factor < 1.0:
+                new_size = (int(img.width * scale_factor), int(img.height * scale_factor))
+                resized_img = img.resize(new_size, Image.Resampling.LANCZOS)
+            else:
+                resized_img = img
+            
+            # Save to bytes buffer with current quality
+            buffer = io.BytesIO()
+            resized_img.save(buffer, format='JPEG', quality=quality, optimize=True)
+            image_data = buffer.getvalue()
+            
+            # Check size
+            if len(image_data) <= MAX_SIZE_BYTES:
+                break
+            
+            # Reduce quality or scale
+            if quality > 60:
+                quality -= 5
+            elif scale_factor > 0.5:
+                scale_factor -= 0.1
+                quality = 85  # Reset quality when scaling
+            else:
+                # If we can't compress enough, use what we have
+                click.echo(f"  ⚠️  Warning: Image still {len(image_data) / 1024 / 1024:.1f}MB after compression")
+                break
+        
+        final_size_mb = len(image_data) / 1024 / 1024
+        if final_size_mb < MAX_SIZE_BYTES / 1024 / 1024:
+            click.echo(f"  ✓ Compressed image to {final_size_mb:.2f}MB (quality={quality}, scale={scale_factor:.1f})")
+        
+        return base64.b64encode(image_data).decode('utf-8'), 'image/jpeg'
     
     def pdf_to_images(self, pdf_path: str, pages: str) -> List[str]:
         """
@@ -453,13 +490,21 @@ def extract(pdf, image, pages, output, examples, threshold, max_retries):
         # Parse and concatenate DataFrames
         dfs = [pd.read_csv(io.StringIO(data)) for data in all_data]
         combined_df = pd.concat(dfs, ignore_index=True)
-        combined_df.to_csv(output, index=False)
+        
+        # Ensure output directory exists
+        output_path = Path("output") / output
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        combined_df.to_csv(output_path, index=False)
     else:
+        # Ensure output directory exists
+        output_path = Path("output") / output
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        
         # Save single page data
-        with open(output, 'w', encoding='utf-8') as f:
+        with open(output_path, 'w', encoding='utf-8') as f:
             f.write(all_data[0])
     
-    click.echo(f"\n✅ Success! Data saved to: {output}")
+    click.echo(f"\n✅ Success! Data saved to: {output_path}")
     click.echo(f"\n💡 Tip: Review the output file to verify accuracy")
     
     # Cleanup temp files
